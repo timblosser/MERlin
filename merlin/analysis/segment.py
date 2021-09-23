@@ -307,7 +307,7 @@ class CellPoseSegment(FeatureSavingAnalysisTask):
                          for z in range(len(self.dataSet.get_z_positions()))])
 
     def _run_analysis(self, fragmentIndex):
-         globalTask = self.dataSet.load_analysis_task(
+        globalTask = self.dataSet.load_analysis_task(
                 self.parameters['global_align_task'])
 
         # read membrane and nuclear indices
@@ -321,7 +321,7 @@ class CellPoseSegment(FeatureSavingAnalysisTask):
         membrane_images = self._read_image_stack(fragmentIndex, membrane_ids)
 
         # preprocess the images 
-        nuclear_images_pp, membrane_images_pp = preprocess_image_channels(nuclear_images, membrane_images)
+        nuclear_images_pp, membrane_images_pp = self.preprocess_image_channels(nuclear_images, membrane_images)
 
         # Combine the images into a stack
         zero_images = np.zeros(nuclear_images.shape)
@@ -348,7 +348,6 @@ class CellPoseSegment(FeatureSavingAnalysisTask):
 
         featureDB = self.get_feature_database()
         featureDB.write_features(featureList, fragmentIndex)
-
 
 
 class CleanCellBoundaries(analysistask.ParallelAnalysisTask):
