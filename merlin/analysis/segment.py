@@ -337,7 +337,10 @@ class CellPoseSegment(FeatureSavingAnalysisTask):
                                         resample=True, min_size=self.parameters['min_size'])
 
         # Combine 2D segmentation to 3D segmentation
-        masks3d = self.combine_2d_segmentation_masks_into_3d(masks)
+        if len(masks.shape) == 3: 
+            masks3d = self.combine_2d_segmentation_masks_into_3d(masks)
+        else:
+            masks3d = np.array([masks])
 
         # Get the boundary features
         zPos = np.array(self.dataSet.get_data_organization().get_z_positions())
