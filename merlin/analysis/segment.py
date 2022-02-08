@@ -139,6 +139,8 @@ class CellPoseSegment(FeatureSavingAnalysisTask):
             self.parameters['diameter'] = 60
         if 'min_size' not in self.parameters:
             self.parameters['min_size'] = 200
+        if 'combine_two_models' not in self.parameters:
+            self.parameters['combine_two_models'] = True
 
     def fragment_count(self):
         return len(self.dataSet.get_fovs())
@@ -300,6 +302,37 @@ class CellPoseSegment(FeatureSavingAnalysisTask):
      
         return segmentationCombinedZ
 
+    def add_new_segmentation_masks_to_existing_mask(self, existing_mask:np.ndarray, 
+                                                    new_mask:np.ndarray) -> np.ndarray:
+        '''Add the cells found in the new segmentation mask to an existing mask.
+        Only cells that doesn't overlap with the existing mask will be added.
+        Return:
+            The cell segmentation mask after the addition.
+        '''
+        combined_mask = existing_mask.copy()
+        
+        # Get a binary mask of the segmented regions
+        binary_segemented_mask = existing_mask > 0
+        
+        # Add the cells from the new mask to the existing mask
+        # Run the processs for each z plane
+        for z in range(combined_mask.shape[0]):
+        
+            current_highest_id = np.max(combined_mask[z])
+            new_cell_ids = np.unique(new_mask[z])
+            new_cell_ids = new_cell_ids[new_cell_ids > 0]
+        
+            for nc_id in new_cell_ids:
+            
+                # Only add cells that don't overlap with existing cells
+                overlap_size = np.count_nonzero(binary_segemented_mask[z] * (new_mask[z] == nc_id))
+            
+                if 0 == overlap_size:
+                    current_highest_id += 1
+                    combined_mask[z][new_mask[z] == nc_id] = current_highest_id
+        
+        return combined_mask
+
     def _read_image_stack(self, fov: int, channelIndex: int) -> np.ndarray:
         warpTask = self.dataSet.load_analysis_task(
             self.parameters['warp_task'])
@@ -325,22 +358,42 @@ class CellPoseSegment(FeatureSavingAnalysisTask):
 
         # Combine the images into a stack
         zero_images = np.zeros(nuclear_images.shape)
-        stacked_images = np.stack((zero_images, membrane_images_pp, nuclear_images_pp), axis=3)
+        stacked_images_cyto = np.stack((zero_images, membrane_images_pp, nuclear_images_pp), axis=3)
 
         # Load the cellpose model. 'cyto2' performs better than 'cyto'.
-        model = cellpose.models.Cellpose(gpu=self.parameters['use_gpu'], model_type='cyto2')
+        model_cyto = cellpose.models.Cellpose(gpu=self.parameters['use_gpu'], model_type='cyto2')
 
-        # Run the cellpose prediction
-        chan = [2,3]
-        masks, flows, styles, diams = model.eval(stacked_images, diameter=self.parameters['diameter'], 
-                                        do_3D=False, channels=chan, 
+        # Run the cellpose prediction using the nuclear and membrane stains
+        masks_cyto, flows_cyto, styles_cyto, diams_cyto = model_cyto.eval(stacked_images_cyto, 
+                                        diameter=self.parameters['diameter'], 
+                                        do_3D=False, channels=[2, 3], 
                                         resample=True, min_size=self.parameters['min_size'])
 
-        # Combine 2D segmentation to 3D segmentation
-        if len(masks.shape) == 3: 
-            masks3d = self.combine_2d_segmentation_masks_into_3d(masks)
+        # Run a separate segmentation using only the nuclear stain
+        if self.parameters['combine_two_models']:
+            stacked_images_nuclei = np.stack((zero_images, zero_images, nuclear_images_pp), axis=3)
+            
+            # Load the nuclei model
+            model_nuclei = cellpose.models.Cellpose(gpu=self.parameters['use_gpu'], model_type='nuclei')
+
+            # Run the cellpose prediction using the nuclear stain
+            masks_nuclei, flows_nuclei, styles_nuclei, diams_nuclei = model_nuclei.eval(stacked_images_nuclei, 
+                                            diameter=self.parameters['diameter'], 
+                                            do_3D=False, channels=[3, 0], 
+                                            resample=True, min_size=self.parameters['min_size'])
+
+            # Combine the masks from the cyto2 and the nuclei models
+            masks_combined = self.add_new_segmentation_masks_to_existing_mask(masks_cyto, masks_nuclei)
+
         else:
-            masks3d = np.array([masks])
+            masks_combined = masks_cyto
+
+
+        # Combine 2D segmentation to 3D segmentation
+        if len(masks_combined.shape) == 3: 
+            masks3d = self.combine_2d_segmentation_masks_into_3d(masks_combined)
+        else:
+            masks3d = np.array([masks_combined])
 
         # Get the boundary features
         zPos = np.array(self.dataSet.get_data_organization().get_z_positions())
