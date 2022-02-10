@@ -290,13 +290,20 @@ class SpatialFeature(object):
             a numpy array of booleans containing true in the i'th index if
                 the i'th point provided is in this spatial feature.
         """
+        bounding_box = self.get_bounding_box()
+        
         boundaries = self.get_boundaries()
         positionList[:, 2] = np.round(positionList[:, 2])
 
         containmentList = np.zeros(positionList.shape[0], dtype=np.bool)
 
         for zIndex in range(len(boundaries)):
-            currentIndexes = np.where(positionList[:, 2] == zIndex)[0]
+            currentIndexes = np.where(np.all([positionList[:, 2] == zIndex,
+                                              bounding_box[0] <= positionList[:, 0],
+                                              bounding_box[1] <= positionList[:, 1],
+                                              bounding_box[2] >= positionList[:, 0],
+                                              bounding_box[3] >= positionList[:, 1]], axis=0))[0]
+            
             currentContainment = [self.contains_point(
                 geometry.Point(x[0], x[1]), zIndex)
                 for x in positionList[currentIndexes]]
