@@ -138,6 +138,26 @@ class SpatialFeature(object):
             inPolygons: List[geometry.Polygon]) -> List[geometry.Polygon]:
         return [p for p in inPolygons if p.is_valid]
 
+    def make_a_buffered_copy(self, buffer_size: float):
+        '''Make a buffered copy of the SpatialFeature where the
+        boundaries in each Z plane is expanded (positive buffer_size)
+        or shrinked (negative buffer_size) by the buffer_size.
+        '''
+        new_boundaryList = []
+        for i in range(len(self._boundaryList)):
+            new_boundaryList.append([])
+
+            for pg in self._boundaryList[i]:
+                p_b = pg.buffer(buffer_size)
+
+                if p_b.geom_type == 'MultiPolygon':
+                    for p in p_b:
+                        new_boundaryList[i].append(p)
+                else:
+                    new_boundaryList[i].append(p_b)
+
+        return SpatialFeature(new_boundaryList, self._fov, self._zCoordinates.copy(), self._uniqueID)
+
     def set_fov(self, newFOV: int) -> None:
         """Update the FOV for this spatial feature.
 
