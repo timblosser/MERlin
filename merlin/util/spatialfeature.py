@@ -296,6 +296,9 @@ class SpatialFeature(object):
         positionList[:, 2] = np.round(positionList[:, 2])
 
         containmentList = np.zeros(positionList.shape[0], dtype=np.bool)
+        
+        if len(bounding_box) != 4:
+            return containmentList
 
         for zIndex in range(len(boundaries)):
             currentIndexes = np.where(np.all([positionList[:, 2] == zIndex,
