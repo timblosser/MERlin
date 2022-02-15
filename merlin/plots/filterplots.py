@@ -329,13 +329,13 @@ class AdaptiveFilterCountsPerArea(AbstractPlot):
         areaBins = adaptiveTask.get_area_bins()
         allCountsPerArea = np.sum(blankHistogram + codingHistogram, axis=(0, 1))
         blankHistogram[blankFraction >= threshold] = 0
-        codingHistogram[codingHistogram >= threshold] = 0
+        codingHistogram[blankFraction >= threshold] = 0
         countsPerArea = np.sum(blankHistogram + codingHistogram, axis=(0, 1))
 
         fig = plt.figure(figsize=(15, 7))
         plt.bar(areaBins[:-1], np.log10(allCountsPerArea), width=1)
         plt.bar(areaBins[:-1], np.log10(countsPerArea), width=1)
-        plt.legend(['All barcodes', 'Filtered barcodes'])
+        plt.legend(['All barcodes', 'Barcodes passed filtering'])
         plt.ylabel('Barcode count (log10)')
         plt.xlabel('Area')
         plt.title('Abundance vs area')
