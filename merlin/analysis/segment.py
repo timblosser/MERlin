@@ -141,6 +141,10 @@ class CellPoseSegment(FeatureSavingAnalysisTask):
             self.parameters['min_size'] = 200
         if 'combine_two_models' not in self.parameters:
             self.parameters['combine_two_models'] = True
+        if 'dump_preprocessed_images' not in self.parameters:
+            self.parameters['dump_preprocessed_images'] = True
+        if 'dump_segmented_masks' not in self.parameters:
+            self.parameters['dump_segmented_masks'] = True
 
     def fragment_count(self):
         return len(self.dataSet.get_fovs())
@@ -339,6 +343,14 @@ class CellPoseSegment(FeatureSavingAnalysisTask):
         return np.array([warpTask.get_aligned_image(fov, channelIndex, z)
                          for z in range(len(self.dataSet.get_z_positions()))])
 
+    def _save_tiff_images(self, fov, filename_prefix, image_stack):
+        '''Save a stack of images as a tiff file.'''
+        with self.dataSet.writer_for_analysis_images(self, filename_prefix, fov) as outputTif:
+             for i in range(image_stack.shape[0]):
+                    outputTif.save(image_stack[i].astype(np.float32),
+                                   photometric='MINISBLACK',
+                                   contiguous=True)
+
     def _run_analysis(self, fragmentIndex):
         globalTask = self.dataSet.load_analysis_task(
                 self.parameters['global_align_task'])
@@ -355,6 +367,10 @@ class CellPoseSegment(FeatureSavingAnalysisTask):
 
         # preprocess the images 
         nuclear_images_pp, membrane_images_pp = self.preprocess_image_channels(nuclear_images, membrane_images)
+
+        if self.parameters['dump_preprocessed_images']:
+            self._save_tiff_images(fragmentIndex, 'preprocessed_nuclear_images', nuclear_images_pp)
+            self._save_tiff_images(fragmentIndex, 'preprocessed_membrane_images', membrane_images_pp)
 
         # Combine the images into a stack
         zero_images = np.zeros(nuclear_images.shape)
@@ -394,6 +410,9 @@ class CellPoseSegment(FeatureSavingAnalysisTask):
             masks3d = self.combine_2d_segmentation_masks_into_3d(masks_combined)
         else:
             masks3d = np.array([masks_combined])
+        
+        if self.parameters['dump_segmented_masks']:
+            self._save_tiff_images(fragmentIndex, 'segmented_mask', masks3d)
 
         # Get the boundary features
         zPos = np.array(self.dataSet.get_data_organization().get_z_positions())
