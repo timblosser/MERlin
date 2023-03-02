@@ -430,26 +430,26 @@ class CellPoseSegmentSingleChannel(FeatureSavingAnalysisTask):
 
     """
     An analysis task that determines the boundaries of features in the
-    image data in each field of view using a the specified machine learning
-    method. The available method is cellpose (https://github.com/MouseLand/
-    cellpose).
+    image data in each field of view using cellpose (https://github.com/
+    MouseLand/cellpose).
 
-    TODO: implement unets / Ilastik
     """
 
     def __init__(self, dataSet, parameters=None, analysisName=None):
         super().__init__(dataSet, parameters, analysisName)
 
-        if 'method' not in self.parameters:
-            self.parameters['method'] = 'cellpose'
+        # if 'method' not in self.parameters:
+        #     self.parameters['method'] = 'cellpose'
         if 'diameter' not in self.parameters:
             self.parameters['diameter'] = 50
-        if 'compartment_channel_name' not in self.parameters:
+        if 'channel_name' not in self.parameters:
             self.parameters['compartment_channel_name'] = 'DAPI'
         if 'flow_threshold' not in self.parameters:
             self.parameters['flow_threshold'] = 0.5
         if 'cellprob_threshold' not in self.parameters:
             self.parameters['cellprob_threshold'] = 1
+        if 'model_type' not in self.parameters:
+            self.parameters['model_type'] = 'cyto2' 
 
     def fragment_count(self):
         return len(self.dataSet.get_fovs())
@@ -469,6 +469,116 @@ class CellPoseSegmentSingleChannel(FeatureSavingAnalysisTask):
     def get_cell_boundaries(self) -> List[spatialfeature.SpatialFeature]:
         featureDB = self.get_feature_database()
         return featureDB.read_features()
+
+    def get_overlapping_objects(self, segmentationZ0: np.ndarray,
+                                segmentationZ1: np.ndarray,
+                                n0: int,
+                                fraction_threshold0: float=0.2,
+                                fraction_threshold1: float=0.2) -> Tuple[np.float64, 
+                                                  np.float64, np.float64]:
+        """compare cell labels in adjacent image masks
+        Args:
+            segmentationZ0: a 2 dimensional numpy array containing a
+                segmentation mask in position Z
+            segmentationZ1: a 2 dimensional numpy array containing a
+                segmentation mask adjacent to segmentationZ0
+            n0: an integer with the index of the object (cell/nuclei)
+                to be compared between the provided segmentation masks
+        Returns:
+            a tuple (n1, f0, f1) containing the label of the cell in Z1
+            overlapping n0 (n1), the fraction of n0 overlaping n1 (f0) and
+            the fraction of n1 overlapping n0 (f1)
+        """
+    
+        z1Indexes = np.unique(segmentationZ1[segmentationZ0 == n0])
+    
+        z1Indexes = z1Indexes[z1Indexes > 0]
+    
+        if z1Indexes.shape[0] > 0:
+    
+            # calculate overlap fraction
+            n0Area = np.count_nonzero(segmentationZ0 == n0)
+            n1Area = np.zeros(len(z1Indexes))
+            overlapArea = np.zeros(len(z1Indexes))
+    
+            for ii in range(len(z1Indexes)):
+                n1 = z1Indexes[ii]
+                n1Area[ii] = np.count_nonzero(segmentationZ1 == n1)
+                overlapArea[ii] = np.count_nonzero((segmentationZ0 == n0) *
+                                                   (segmentationZ1 == n1))
+    
+            n0OverlapFraction = np.asarray(overlapArea / n0Area)
+            n1OverlapFraction = np.asarray(overlapArea / n1Area)
+            index = list(range(len(n0OverlapFraction)))
+    
+            # select the nuclei that has the highest fraction in n0 and n1
+            r1, r2, indexSorted = zip(*sorted(zip(n0OverlapFraction,
+                                                  n1OverlapFraction,
+                                                  index),
+                                      key=lambda x:x[0]+x[1],
+                                      reverse=True))
+                  
+            if (n0OverlapFraction[indexSorted[0]] > fraction_threshold0 and
+                    n1OverlapFraction[indexSorted[0]] > fraction_threshold1):
+                return (z1Indexes[indexSorted[0]],
+                        n0OverlapFraction[indexSorted[0]],
+                        n1OverlapFraction[indexSorted[0]])
+            else:
+                return (False, False, False)
+        else:
+            return (False, False, False)
+
+    def combine_2d_segmentation_masks_into_3d(self, segmentationOutput:
+                                              np.ndarray) -> np.ndarray:
+        """Take a 3 dimensional segmentation masks and relabel them so that
+        nuclei in adjacent sections have the same label if the area their
+        overlap surpases certain threshold
+        Args:
+            segmentationOutput: a 3 dimensional numpy array containing the
+                segmentation masks arranged as (z, x, y).
+        Returns:
+            ndarray containing a 3 dimensional mask arranged as (z, x, y) of
+                relabeled segmented cells
+        """
+    
+        # Initialize empty array with size as segmentationOutput array
+        segmentationCombinedZ = np.zeros(segmentationOutput.shape)
+    
+        # copy the mask of the section farthest to the coverslip to start
+        segmentationCombinedZ[-1, :, :] = segmentationOutput[-1, :, :]
+        
+        # starting far from coverslip
+        for z in range(segmentationOutput.shape[0]-1, 0, -1):
+    
+            # get non-background cell indexes for plane Z
+            zIndex = np.unique(segmentationCombinedZ[z, :, :])[
+                                    np.unique(segmentationCombinedZ[z, :, :]) > 0]
+    
+            # get non-background cell indexes for plane Z-1
+            zm1Index = np.unique(segmentationOutput[z-1, :, :])[
+                                    np.unique(segmentationOutput[z-1, :, :]) > 0]
+            assigned_zm1Index = []
+            
+            # compare each cell in z0
+            for n0 in zIndex:
+                n1, f0, f1 = self.get_overlapping_objects(segmentationCombinedZ[z, :, :],
+                                                     segmentationOutput[z-1, :, :],
+                                                     n0)
+                if n1:
+                    segmentationCombinedZ[z-1, :, :][
+                        (segmentationOutput[z-1, :, :] == n1)] = n0
+                    assigned_zm1Index.append(n1)
+            
+            # keep the un-assigned indices in the Z-1 plane
+            unassigned_zm1Index = [i for i in zm1Index if i not in assigned_zm1Index]
+            max_current_id = np.max(segmentationCombinedZ[z-1:, :, :])
+            for i in range(len(unassigned_zm1Index)):
+                unassigned_id = unassigned_zm1Index[i]
+                segmentationCombinedZ[z-1, :, :][
+                        (segmentationOutput[z-1, :, :] == unassigned_id)] = max_current_id + 1 +i
+     
+        return segmentationCombinedZ
+
 
     def _run_analysis(self, fragmentIndex):
 
