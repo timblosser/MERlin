@@ -494,20 +494,10 @@ class CellPoseSegmentSingleChannel(FeatureSavingAnalysisTask):
     def preprocess_image_channels(self, seg_image):
         # Remove the hot-pixels
         seg_image = self.scale_image(seg_image, 99.9)
-'''
-        membrane_marker_image = self.scale_image(membrane_marker_image, 99.9)
-        
-        # Run the high-pass filter for the membrance channel
-        sigma = 5
-        truncate = 2
-        membrane_marker_image = self.high_pass_filter_individual_z(membrane_marker_image, sigma, truncate)
-'''
          
         # Enhance the contrast by adaptive histogram equalization
         seg_image = self.adaptive_equalize_hist_individual_z(seg_image, clip_limit=0.05)
-'''
-        membrane_marker_image = self.adaptive_equalize_hist_individual_z(membrane_marker_image, clip_limit=0.05)
-'''     
+
         return seg_image
 
     def get_overlapping_objects(self, segmentationZ0: np.ndarray,
@@ -638,77 +628,32 @@ class CellPoseSegmentSingleChannel(FeatureSavingAnalysisTask):
 
         globalTask = self.dataSet.load_analysis_task(
                 self.parameters['global_align_task'])
-'''
-        # read membrane and nuclear indices
-        nuclear_ids = self.dataSet.get_data_organization().get_data_channel_index(
-                self.parameters['nuclear_channel'])
-        membrane_ids = self.dataSet.get_data_organization().get_data_channel_index(
-                self.parameters['membrane_channel'])
-'''
+
         # read channel index
         channel_ids = self.dataSet.get_data_organization().get_data_channel_index(
                 self.parameters['channel_name'])
-'''
-        # read images and perform segmentation
-        nuclear_images = self._read_image_stack(fragmentIndex, nuclear_ids)
-        membrane_images = self._read_image_stack(fragmentIndex, membrane_ids)
-'''
+
         # read images and perform segmentation
         seg_images = self._read_image_stack(fragmentIndex, channel_ids)
-'''
-        # preprocess the images 
-        nuclear_images_pp, membrane_images_pp = self.preprocess_image_channels(nuclear_images, membrane_images)
-'''
+
         # preprocess the images 
         seg_images_pp = self.preprocess_image_channels(seg_images)
-'''
-
-        if self.parameters['dump_preprocessed_images']:
-            self._save_tiff_images(fragmentIndex, 'preprocessed_nuclear_images', nuclear_images_pp)
-            self._save_tiff_images(fragmentIndex, 'preprocessed_membrane_images', membrane_images_pp)
-'''
 
         if self.parameters['dump_preprocessed_images']:
             self._save_tiff_images(fragmentIndex, 'preprocessed_seg_images', nuclear_images_pp)
-'''
+
         # Combine the images into a stack
-        zero_images = np.zeros(nuclear_images.shape)
-        stacked_images_cyto = np.stack((zero_images, membrane_images_pp, nuclear_images_pp), axis=3)
-
-        # Load the cellpose model. 'cyto2' performs better than 'cyto'.
-        model_cyto = cellpose.models.Cellpose(gpu=self.parameters['use_gpu'], model_type='cyto2')
-
-        # Run the cellpose prediction using the nuclear and membrane stains
-        masks_cyto, flows_cyto, styles_cyto, diams_cyto = model_cyto.eval(stacked_images_cyto, 
-                                        diameter=self.parameters['diameter'], 
-                                        do_3D=False, channels=[2, 3], 
-                                        resample=True, min_size=self.parameters['min_size'])
-
-        # Run a separate segmentation using only the nuclear stain
-        if self.parameters['combine_two_models']:
-'''
-            
         stacked_images = np.stack((zero_images, zero_images, seg_images_pp), axis=3)
             
         # Load the cellpose model. 'cyto2' performs better than 'cyto'.
         # Use also for dapi 
         model = cellpose.models.Cellpose(gpu=self.parameters['use_gpu'], model_type='cyto2')
-'''    
-        # Load the nuclei model
-        model_nuclei = cellpose.models.Cellpose(gpu=self.parameters['use_gpu'], model_type='nuclei')
-'''
+
         # Run the cellpose prediction 
         masks, flows, styles, diams = model.eval(stacked_images, 
                                             diameter=self.parameters['diameter'], 
                                             do_3D=False, channels=[3, 0], 
                                             resample=True, min_size=self.parameters['min_size'])
-'''
-            # Combine the masks from the cyto2 and the nuclei models
-            masks_combined = self.add_new_segmentation_masks_to_existing_mask(masks_cyto, masks_nuclei)
-
-        else:
-            masks_combined = masks_cyto
-'''
 
         # Combine 2D segmentation to 3D segmentation
         if len(masks.shape) == 3: 
