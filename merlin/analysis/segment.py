@@ -640,7 +640,7 @@ class CellPoseSegmentSingleChannel(FeatureSavingAnalysisTask):
         seg_images_pp = self.preprocess_image_channels(seg_images)
 
         if self.parameters['dump_preprocessed_images']:
-            self._save_tiff_images(fragmentIndex, 'preprocessed_seg_images', nuclear_images_pp)
+            self._save_tiff_images(fragmentIndex, 'preprocessed_seg_images', seg_images_pp)
 
         # Combine the images into a stack
         stacked_images = np.stack((zero_images, zero_images, seg_images_pp), axis=3)
