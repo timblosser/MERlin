@@ -456,6 +456,8 @@ class CellPoseSegmentSingleChannel(FeatureSavingAnalysisTask):
             self.parameters['dump_segmented_masks'] = True
         if 'min_size' not in self.parameters:
             self.parameters['min_size'] = 100
+        if 'use_gpu' not in self.parameters:
+            self.parameters['use_gpu'] = False
 
     def fragment_count(self):
         return len(self.dataSet.get_fovs())
@@ -643,6 +645,7 @@ class CellPoseSegmentSingleChannel(FeatureSavingAnalysisTask):
             self._save_tiff_images(fragmentIndex, 'preprocessed_seg_images', seg_images_pp)
 
         # Combine the images into a stack
+        zero_images = np.zeros(seg_images.shape)
         stacked_images = np.stack((zero_images, zero_images, seg_images_pp), axis=3)
             
         # Load the cellpose model. 'cyto2' performs better than 'cyto'.
