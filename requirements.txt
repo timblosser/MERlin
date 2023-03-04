@@ -5,7 +5,7 @@ docutils
 google-cloud-storage
 h5py
 matplotlib
-networkx
+networkx>=3.0
 numexpr
 numpy
 opencv-python

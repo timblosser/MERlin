@@ -708,7 +708,7 @@ class CleanCellBoundaries(analysistask.ParallelAnalysisTask):
                 self.parameters['global_align_task']]
 
     def return_exported_data(self, fragmentIndex) -> nx.Graph:
-        return self.dataSet.load_graph_from_gpickle(
+        return self.dataSet.load_graph_from_pickle(
             'cleaned_cells', self, fragmentIndex)
 
     def _run_analysis(self, fragmentIndex) -> None:
@@ -737,7 +737,7 @@ class CleanCellBoundaries(analysistask.ParallelAnalysisTask):
                                                spatialTree, fragmentIndex,
                                                allFOVs, fovBoxes)
 
-        self.dataSet.save_graph_as_gpickle(
+        self.dataSet.save_graph_as_pickle(
             graph, 'cleaned_cells', self, fragmentIndex)
 
 
