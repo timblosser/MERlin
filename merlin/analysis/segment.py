@@ -1,3 +1,4 @@
+import os
 import cv2
 import numpy as np
 from skimage import measure
@@ -450,6 +451,8 @@ class CellPoseSegmentSingleChannel(FeatureSavingAnalysisTask):
             self.parameters['cellprob_threshold'] = 1
         if 'model_type' not in self.parameters:
             self.parameters['model_type'] = 'cyto2' 
+        if 'path_to_user_model' not in self.parameters:
+            self.parameters['path_to_user_model'] = False
         if 'dump_preprocessed_images' not in self.parameters:
             self.parameters['dump_preprocessed_images'] = True
         if 'dump_segmented_masks' not in self.parameters:
@@ -648,15 +651,26 @@ class CellPoseSegmentSingleChannel(FeatureSavingAnalysisTask):
         zero_images = np.zeros(seg_images.shape)
         stacked_images = np.stack((zero_images, zero_images, seg_images_pp), axis=3)
             
-        # Load the cellpose model. 'cyto2' performs better than 'cyto'.
-        # Use also for dapi 
-        model = cellpose.models.Cellpose(gpu=self.parameters['use_gpu'], model_type='cyto2')
+        # if path_to_user_model exist, override and use user model
+        if self.parameters['path_to_user_model']:
+            model = cellpose.models.CellposeModel(use_gpu=self.parameters['use_gpu'], pretrained_model=self.parameters['path_to_user_model'])
 
-        # Run the cellpose prediction 
-        masks, flows, styles, diams = model.eval(stacked_images, 
-                                            diameter=self.parameters['diameter'], 
+            # Run the cellpose prediction 
+            masks, flows, styles, diams = model.eval(stacked_images, 
+                                            diameter=None, 
                                             do_3D=False, channels=[3, 0], 
                                             resample=True, min_size=self.parameters['min_size'])
+
+        else:
+            # Load the cellpose model. 'cyto2' performs better than 'cyto'.
+            # Use also for dapi 
+            model = cellpose.models.Cellpose(gpu=self.parameters['use_gpu'], model_type=self.parameters['model_type'])
+
+            # Run the cellpose prediction 
+            masks, flows, styles, diams = model.eval(stacked_images, 
+                                                diameter=self.parameters['diameter'], 
+                                                do_3D=False, channels=[3, 0], 
+                                                resample=True, min_size=self.parameters['min_size'])
 
         # Combine 2D segmentation to 3D segmentation
         if len(masks.shape) == 3: 
