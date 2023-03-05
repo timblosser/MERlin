@@ -653,7 +653,7 @@ class CellPoseSegmentSingleChannel(FeatureSavingAnalysisTask):
             
         # if path_to_user_model exist, override and use user model
         if self.parameters['path_to_user_model']:
-            model = cellpose.models.CellposeModel(use_gpu=self.parameters['use_gpu'], pretrained_model=self.parameters['path_to_user_model'])
+            model = cellpose.models.CellposeModel(pretrained_model=self.parameters['path_to_user_model'])
 
             # Run the cellpose prediction 
             masks, flows, styles, diams = model.eval(stacked_images, 
