@@ -22,7 +22,7 @@ scikit-learn
 scipy
 seaborn
 setuptools
-shapely
+shapely>=2.0
 snakemake
 Sphinx
 sphinx-rtd-theme
