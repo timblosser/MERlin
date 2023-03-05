@@ -143,15 +143,18 @@ class SpatialFeature(object):
         boundaries in each Z plane is expanded (positive buffer_size)
         or shrinked (negative buffer_size) by the buffer_size.
         '''
+
         new_boundaryList = []
         for i in range(len(self._boundaryList)):
             new_boundaryList.append([])
+            print(f'{i}')
 
             for pg in self._boundaryList[i]:
+
                 p_b = pg.buffer(buffer_size)
 
                 if p_b.geom_type == 'MultiPolygon':
-                    for p in p_b:
+                    for p in p_b.geoms:
                         new_boundaryList[i].append(p)
                 else:
                     new_boundaryList[i].append(p_b)

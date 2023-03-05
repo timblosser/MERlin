@@ -85,6 +85,8 @@ class PartitionBarcodes(analysistask.ParallelAnalysisTask):
         sDB = assignmentTask.get_feature_database()
         currentCells = sDB.read_features(fragmentIndex)
 
+        print(f'FOV {fragmentIndex} has {len(currentCells)} cells.')
+
         countsDF = pandas.DataFrame(
             data=np.zeros((len(currentCells), barcodeCount)),
             columns=range(barcodeCount),
