@@ -656,11 +656,10 @@ class CellPoseSegmentSingleChannel(FeatureSavingAnalysisTask):
             model = cellpose.models.CellposeModel(pretrained_model=self.parameters['path_to_user_model'])
 
             # Run the cellpose prediction 
-            masks, flows, styles, diams = model.eval(stacked_images, 
+            masks, flows, styles    = model.eval(stacked_images, 
                                             diameter=None, 
                                             do_3D=False, channels=[3, 0], 
                                             resample=True, min_size=self.parameters['min_size'])
-
         else:
             # Load the cellpose model. 'cyto2' performs better than 'cyto'.
             # Use also for dapi 
