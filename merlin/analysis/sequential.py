@@ -68,7 +68,7 @@ class SumSignal(analysistask.ParallelAnalysisTask):
                 cellCoords.append(pixels)
 
         cellIDs = [str(cells[x].get_feature_id()) for x in range(len(cells))]
-        mask = np.zeros(inputImage.shape, np.uint8)
+        mask = np.zeros(inputImage.shape, np.uint16)
         for i, cell in enumerate(cellCoords):
             cv2.drawContours(mask, cell, -1, i+1, -1)
         propsDict = {x.label: x for x in regionprops(mask, inputImage)}
@@ -103,7 +103,7 @@ class SumSignal(analysistask.ParallelAnalysisTask):
         # adding num of pixels
         signals.append(self._extract_signal(cells, img, zIndex).iloc[:, [1]])
 
-        compiledSignal = pandas.concat(signals, 1)
+        compiledSignal = pandas.concat(signals, axis=1)
         compiledSignal.columns = channels+['Pixels']
 
         return compiledSignal
